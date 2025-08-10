@@ -1,0 +1,132 @@
+#include <iostream>
+#include <fstream>
+#include <string>
+#include <thread>
+#include <vector>
+#include <chrono>
+using namespace std;
+using namespace std::chrono;
+
+// Function to compress a chunk using RLE
+string compressChunk(const string &chunk) {
+    string compressed = "";
+    for (size_t i = 0; i < chunk.size(); i++) {
+        int count = 1;
+        while (i + 1 < chunk.size() && chunk[i] == chunk[i + 1]) {
+            count++;
+            i++;
+        }
+        compressed += chunk[i];
+        compressed += to_string(count);
+    }
+    return compressed;
+}
+
+// Function to decompress a chunk
+string decompressChunk(const string &chunk) {
+    string decompressed = "";
+    for (size_t i = 0; i < chunk.size(); i++) {
+        char ch = chunk[i];
+        string num = "";
+        while (i + 1 < chunk.size() && isdigit(chunk[i + 1])) {
+            num += chunk[++i];
+        }
+        int count = stoi(num);
+        decompressed.append(count, ch);
+    }
+    return decompressed;
+}
+
+// Multithreaded compression
+void compressFile(const string &inputFile, const string &outputFile) {
+    ifstream in(inputFile);
+    if (!in) {
+        cout << "Error: Cannot open input file\n";
+        return;
+    }
+
+    string data((istreambuf_iterator<char>(in)), istreambuf_iterator<char>());
+    in.close();
+
+    size_t mid = data.size() / 2;
+    string part1 = data.substr(0, mid);
+    string part2 = data.substr(mid);
+
+    string comp1, comp2;
+
+    auto start = high_resolution_clock::now();
+
+    thread t1([&]() { comp1 = compressChunk(part1); });
+    thread t2([&]() { comp2 = compressChunk(part2); });
+
+    t1.join();
+    t2.join();
+
+    auto end = high_resolution_clock::now();
+
+    ofstream out(outputFile);
+    out << comp1 << comp2;
+    out.close();
+
+    cout << "Compression completed.\n";
+    cout << "Time taken (multithreaded): "
+         << duration_cast<milliseconds>(end - start).count() << " ms\n";
+}
+
+// Multithreaded decompression
+void decompressFile(const string &inputFile, const string &outputFile) {
+    ifstream in(inputFile);
+    if (!in) {
+        cout << "Error: Cannot open input file\n";
+        return;
+    }
+
+    string data((istreambuf_iterator<char>(in)), istreambuf_iterator<char>());
+    in.close();
+
+    size_t mid = data.size() / 2;
+    string part1 = data.substr(0, mid);
+    string part2 = data.substr(mid);
+
+    string decomp1, decomp2;
+
+    auto start = high_resolution_clock::now();
+
+    thread t1([&]() { decomp1 = decompressChunk(part1); });
+    thread t2([&]() { decomp2 = decompressChunk(part2); });
+
+    t1.join();
+    t2.join();
+
+    auto end = high_resolution_clock::now();
+
+    ofstream out(outputFile);
+    out << decomp1 << decomp2;
+    out.close();
+
+    cout << "Decompression completed.\n";
+    cout << "Time taken (multithreaded): "
+         << duration_cast<milliseconds>(end - start).count() << " ms\n";
+}
+
+int main() {
+    int choice;
+    string inputFile, outputFile;
+
+    cout << "Enter input file name: ";
+    cin >> inputFile;
+    cout << "Enter output file name: ";
+    cin >> outputFile;
+
+    cout << "1. Compress\n2. Decompress\nChoose: ";
+    cin >> choice;
+
+    if (choice == 1)
+        compressFile(inputFile, outputFile);
+    else if (choice == 2)
+        decompressFile(inputFile, outputFile);
+    else
+        cout << "Invalid choice!\n";
+
+    return 0;
+}
